@@ -1,0 +1,11 @@
+com\example\restservice\Figuras\FiguraDynamicLoader.class
+com\example\restservice\RestServiceApplication.class
+com\example\restservice\Figuras\Rectangulo.class
+com\example\restservice\Figuras\Circulo.class
+com\example\restservice\Figuras\FiguraController.class
+com\example\restservice\Figuras\FiguraService.class
+com\example\restservice\GreetingController.class
+com\example\restservice\Greeting.class
+com\example\restservice\Figuras\FiguraFactory.class
+com\example\restservice\Figuras\Triangulo.class
+com\example\restservice\Figuras\Figura.class

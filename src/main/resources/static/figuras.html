@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Gestor de Figuras Geométricas</title>
+    <style>
+        body { font-family: Arial; margin: 30px; }
+        input, textarea, button { margin: 5px 0; padding: 5px; width: 300px; }
+        table { width: 80%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+        th { background-color: #f4f4f4; }
+        .param-input { width: 50px; margin-right: 5px; }
+    </style>
+</head>
+<body>
+<h1>Gestor de Figuras Geométricas</h1>
+
+<!-- Crear figura nativa -->
+<div>
+    <h3>Crear Figura Nativa</h3>
+    <input type="text" id="nombre" placeholder="Nombre (Circulo, Rectangulo, Triangulo)">
+    <input type="text" id="valores" placeholder="Valores separados por coma"><br>
+    <button onclick="crearFigura()">Crear Figura</button>
+</div>
+
+<hr>
+
+<!-- Crear figura Groovy -->
+<div>
+    <h3>Crear Figura Dinámica (Groovy)</h3>
+    <textarea id="codigo" rows="8" placeholder="Escribe tu clase Groovy aquí"></textarea><br>
+    <div id="parametrosGroovy"></div>
+    <button onclick="crearFiguraGroovy()">Ejecutar Groovy</button>
+</div>
+
+
+<hr>
+
+<h3>Figuras creadas:</h3>
+<table>
+    <thead>
+    <tr><th>#</th><th>Figura</th><th>Área</th><th>Perímetro</th></tr>
+    </thead>
+    <tbody id="tablaFiguras"></tbody>
+</table>
+
+<script>
+    const nombreInput = document.getElementById('nombre');
+    const valoresInput = document.getElementById('valores');
+    const codigoInput = document.getElementById('codigo');
+    const parametrosGroovyDiv = document.getElementById('parametrosGroovy');
+
+    // Placeholder dinámico para figuras nativas
+    nombreInput.addEventListener('blur', async () => {
+        const nombre = nombreInput.value.trim();
+        if(!nombre) return;
+        try {
+            const res = await fetch('/figuras/params?nombre=' + nombre);
+            const params = await res.json();
+            valoresInput.placeholder = params.join(', ');
+        } catch(e) {
+            valoresInput.placeholder = 'Figura no encontrada';
+        }
+    });
+
+    // Detectar constructor Groovy y generar inputs para parámetros
+    codigoInput.addEventListener('blur', async () => {
+        const codigo = codigoInput.value.trim();
+        parametrosGroovyDiv.innerHTML = ''; // limpiar inputs anteriores
+        if(!codigo) return;
+
+        const match = codigo.match(/class\s+(\w+)/);
+        if(!match) return;
+        const nombreClase = match[1];
+
+        try {
+            const res = await fetch('/figuras/params?nombre=' + nombreClase);
+            const params = await res.json(); // lista de nombres de parámetros
+            params.forEach((p, i) => {
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.className = 'param-input';
+                input.placeholder = p + '=1';
+                input.value = 1;
+                parametrosGroovyDiv.appendChild(input);
+            });
+        } catch(e) {
+            parametrosGroovyDiv.innerHTML = 'No se pudo obtener parámetros';
+        }
+    });
+
+    // Crear figura nativa
+    async function crearFigura() {
+        const nombre = nombreInput.value.trim();
+        if(!nombre) return alert("Ingrese nombre de la figura");
+
+        const valores = valoresInput.value.split(',').map(v => parseFloat(v.trim()));
+        const res = await fetch(`/figuras/crearRapido?nombre=${nombre}&` +
+            valores.map(v=>`valores=${v}`).join('&'));
+        await res.json(); // usamos DTO
+        nombreInput.value = '';
+        valoresInput.value = '';
+        cargarFiguras();
+    }
+
+    // Crear figura Groovy
+    async function crearFiguraGroovy() {
+        const codigo = codigoInput.value.trim();
+        if(!codigo) return alert("Ingrese código Groovy");
+
+        const inputs = parametrosGroovyDiv.querySelectorAll('input');
+        const parametros = {};
+        inputs.forEach((input, i) => {
+            parametros[i] = parseFloat(input.value);
+        });
+
+        await fetch('/figuras/crearGroovy?codigo=' + encodeURIComponent(codigo), {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(parametros)
+        });
+
+        codigoInput.value = '';
+        parametrosGroovyDiv.innerHTML = '';
+        cargarFiguras();
+    }
+
+    // Listar figuras
+    async function cargarFiguras() {
+        const res = await fetch('/figuras/listar');
+        const figuras = await res.json();
+        const tbody = document.querySelector('#tablaFiguras');
+        tbody.innerHTML = '';
+        figuras.forEach((f, i) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${i+1}</td><td>${f.nombre}</td><td>${f.area}</td><td>${f.perimetro}</td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // Cargar tabla al abrir la página
+    cargarFiguras();
+</script>
+</body>
+</html>

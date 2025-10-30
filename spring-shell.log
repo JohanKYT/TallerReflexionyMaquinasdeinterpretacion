@@ -1,0 +1,6 @@
+1761791587055:figuras:>crear-figura --nombre Circulo --params radio=5
+1761791627450:crear-figura --nombre Circulo --params radio=5
+1761791808374:listar
+1761791890258:crear-figura --nombre Circulo --params radio=5
+1761791897485:listar
+1761792011702:crear-figura --nombre Circulo --params radio=5

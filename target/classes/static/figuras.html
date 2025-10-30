@@ -15,7 +15,6 @@
 <body>
 <h1>Gestor de Figuras Geométricas</h1>
 
-<!-- Crear figura nativa -->
 <div>
     <h3>Crear Figura Nativa</h3>
     <input type="text" id="nombre" placeholder="Nombre (Circulo, Rectangulo, Triangulo)">
@@ -25,7 +24,6 @@
 
 <hr>
 
-<!-- Crear figura Groovy -->
 <div>
     <h3>Crear Figura Dinámica (Groovy)</h3>
     <textarea id="codigo" rows="8" placeholder="Escribe tu clase Groovy aquí"></textarea><br>
@@ -62,30 +60,61 @@
         }
     });
 
-    // Detectar constructor Groovy y generar inputs para parámetros
-    codigoInput.addEventListener('blur', async () => {
+    // ================================================================
+    // BLOQUE CORREGIDO 1: Detectar constructor Groovy
+    // ================================================================
+    codigoInput.addEventListener('blur', () => {
         const codigo = codigoInput.value.trim();
         parametrosGroovyDiv.innerHTML = ''; // limpiar inputs anteriores
-        if(!codigo) return;
+        if (!codigo) return;
 
-        const match = codigo.match(/class\s+(\w+)/);
-        if(!match) return;
-        const nombreClase = match[1];
+        // --- LÓGICA MEJORADA ---
 
-        try {
-            const res = await fetch('/figuras/params?nombre=' + nombreClase);
-            const params = await res.json(); // lista de nombres de parámetros
-            params.forEach((p, i) => {
-                const input = document.createElement('input');
-                input.type = 'number';
-                input.className = 'param-input';
-                input.placeholder = p + '=1';
-                input.value = 1;
-                parametrosGroovyDiv.appendChild(input);
-            });
-        } catch(e) {
-            parametrosGroovyDiv.innerHTML = 'No se pudo obtener parámetros';
+        // 1. Encontrar el nombre de la clase
+        const classNameMatch = codigo.match(/class\s+(\w+)/);
+        if (!classNameMatch) {
+            console.warn("No se encontró 'class' en el código.");
+            return; // No hay 'class'
         }
+        const className = classNameMatch[1]; // E.g., "Pentagono"
+
+        // 2. Crear una regex para BUSCAR ESE CONSTRUCTOR
+        // E.g., new RegExp("Pentagono\\s*\\(([^)]*)\\)")
+        const constructorRegex = new RegExp(className + '\\s*\\(([^)]*)\\)');
+        const constructorLineMatch = codigo.match(constructorRegex);
+
+        let params = [];
+
+        // 3. Revisar si se encontró el constructor Y si tiene parámetros
+        if (constructorLineMatch && constructorLineMatch[1].trim().length > 0) {
+            // constructorLineMatch[1] es "double lado" o "double base, double altura"
+            params = constructorLineMatch[1].split(',').map(p => p.trim().split(' ').pop());
+        }
+
+        // --- FIN DE LÓGICA MEJORADA ---
+
+        // Si no se encontró constructor o no tiene parámetros, no se crean inputs
+        if (params.length === 0) {
+            console.log("No se detectaron parámetros de constructor.");
+            return;
+        }
+
+        // Crear inputs para cada parámetro detectado
+        params.forEach(p => {
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.className = 'param-input';
+            input.placeholder = p; // Solo el nombre
+            input.value = 1;
+            // Guardamos el nombre del parámetro de forma segura
+            input.dataset.name = p;
+
+            // (Opcional) Añadir una etiqueta
+            const label = document.createElement('label');
+            label.innerText = ` ${p}: `;
+            parametrosGroovyDiv.appendChild(label);
+            parametrosGroovyDiv.appendChild(input);
+        });
     });
 
     // Crear figura nativa
@@ -95,33 +124,53 @@
 
         const valores = valoresInput.value.split(',').map(v => parseFloat(v.trim()));
         const res = await fetch(`/figuras/crearRapido?nombre=${nombre}&` +
-            valores.map(v=>`valores=${v}`).join('&'));
-        await res.json();
+            valores.map(v => `valores=${v}`).join('&'), { method: 'GET' });
+        await res.json(); // usamos DTO
+
         nombreInput.value = '';
         valoresInput.value = '';
         cargarFiguras();
     }
 
-    // Crear figura Groovy
+    // ================================================================
+    // BLOQUE CORREGIDO 2: Crear figura Groovy
+    // ================================================================
     async function crearFiguraGroovy() {
         const codigo = codigoInput.value.trim();
-        if(!codigo) return alert("Ingrese código Groovy");
+        if (!codigo) return alert("Ingrese código Groovy");
 
+        // Tomamos todos los inputs de parámetros generados
         const inputs = parametrosGroovyDiv.querySelectorAll('input');
         const parametros = {};
-        inputs.forEach((input, i) => {
-            parametros[i] = parseFloat(input.value);
+
+        inputs.forEach((input) => {
+            // Leemos el nombre desde 'data-name' (más robusto)
+            const nombre = input.dataset.name;
+            parametros[nombre] = parseFloat(input.value);
         });
 
-        await fetch('/figuras/crearGroovy?codigo=' + encodeURIComponent(codigo), {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(parametros)
-        });
+        try {
+            const res = await fetch('/figuras/crearGroovy?codigo=' + encodeURIComponent(codigo), {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(parametros) // ahora enviamos un objeto
+            });
 
-        codigoInput.value = '';
-        parametrosGroovyDiv.innerHTML = '';
-        cargarFiguras();
+            if (!res.ok) {
+                const text = await res.text();
+                console.error('Error Groovy:', text);
+                alert('Error al crear figura Groovy: ' + text);
+                return;
+            }
+
+            // Limpiamos inputs
+            codigoInput.value = '';
+            parametrosGroovyDiv.innerHTML = '';
+            cargarFiguras();
+        } catch (e) {
+            console.error(e);
+            alert('Error de conexión con el servidor.');
+        }
     }
 
     // Listar figuras
